@@ -1,0 +1,15 @@
+<<<<<<< HEAD
+pandas
+python-telegram-bot
+apscheduler
+pytz
+requests
+openpyxl
+=======
+pandas
+python-telegram-bot
+apscheduler
+pytz
+requests
+openpyxl
+>>>>>>> ea0e754 (Initial commit)

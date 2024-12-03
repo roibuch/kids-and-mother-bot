@@ -103,7 +103,7 @@ async def send_ads_loop():
             print("📛 שבת - אין שליחת הודעות.")
         else:
             # שליחה בין 08:00 ל-23:00 כל 3 שעות
-            if 8 <= now.hour <= 23 and now.hour % 3 == 0 and now.minute == 0:
+            if 8 <= now.hour <= 23 and now.hour % 2 == 0 and now.minute == 0:
                 await send_ad()
 
         # המתנה של דקה לבדיקה חוזרת

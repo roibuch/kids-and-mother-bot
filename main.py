@@ -13,7 +13,7 @@ logging.basicConfig(filename='bot_errors.log', level=logging.ERROR, format='%(as
 
 # טוקן של הבוט בטלגרם
 TELEGRAM_BOT_TOKEN = "7949448573:AAE7CrDbjmhf8vlv8rCwygqFtBsXVIT4kLE"
-TELEGRAM_CHAT_ID = "@babymotherdeals"  # המשתמש של הערוץ החדש
+TELEGRAM_CHAT_ID = "-1002306561230"  # המשתמש של הערוץ החדש
 
 # אתחול הבוט
 bot = Bot(token=TELEGRAM_BOT_TOKEN)

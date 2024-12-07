@@ -18,38 +18,44 @@ TELEGRAM_CHAT_ID = "@babymotherdeals"  # המשתמש של הערוץ החדש
 # אתחול הבוט
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
-# קריאת זמני כניסת ויציאת שבת
-try:
-    shabbat_file_path = "shabbat_times.csv"
-    shabbat_times = pd.read_csv(shabbat_file_path)
-    shabbat_times["shabbat_start"] = pd.to_datetime(
-        shabbat_times["shabbat_start"], format="%d/%m/%Y %H:%M", dayfirst=True
-    ).dt.tz_localize("Asia/Jerusalem", ambiguous='NaT', nonexistent='NaT')
-    shabbat_times["shabbat_end"] = pd.to_datetime(
-        shabbat_times["shabbat_end"], format="%d/%m/%Y %H:%M", dayfirst=True
-    ).dt.tz_localize("Asia/Jerusalem", ambiguous='NaT', nonexistent='NaT')
-    print(f"✅ הקובץ {shabbat_file_path} נטען בהצלחה.")
-except Exception as e:
-    print(f"❌ שגיאה: לא ניתן לקרוא את הקובץ {shabbat_file_path}.")
-    logging.error(f"Error reading {shabbat_file_path}: {e}")
-    exit()
-
 # אזור הזמן של ירושלים
 jerusalem_tz = timezone("Asia/Jerusalem")
 
-# קריאת הנתונים מקובץ Excel
-file_path = 'generated_ads.xlsx'
-try:
-    data = pd.read_excel(file_path)
-    print(f"✅ הקובץ {file_path} נטען בהצלחה.")
-except FileNotFoundError:
-    print(f"❌ שגיאה: הקובץ {file_path} לא נמצא.")
-    logging.error(f"FileNotFoundError: {file_path} not found.")
-    exit()
+# טווח ימים לטעינת זמנים מראש
+FETCH_DAYS = 30
+shabbat_holiday_times = []
 
-# המרת ההודעות לרשימה
-ads = data.to_dict(orient="records")
-sent_ads = []
+# פונקציה למשיכת זמני שבת וחגים מה-API
+def fetch_shabbat_holiday_times():
+    try:
+        print("🔄 Fetching shabbat and holiday times...")
+        url = f"https://www.hebcal.com/shabbat?cfg=json&geonameid=281184&start={datetime.datetime.now().strftime('%Y-%m-%d')}&end={(datetime.datetime.now() + datetime.timedelta(days=FETCH_DAYS)).strftime('%Y-%m-%d')}&M=on"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        times = []
+        for item in data.get("items", []):
+            if item["category"] in ["candles", "havdalah"]:
+                start_time = datetime.datetime.fromisoformat(item["date"]).astimezone(jerusalem_tz)
+                end_time = start_time + datetime.timedelta(hours=25) if item["category"] == "candles" else start_time
+                times.append({
+                    "name": item["title"],
+                    "start": start_time,
+                    "end": end_time
+                })
+        print(f"✅ Loaded {len(times)} shabbat/holiday times.")
+        return times
+    except Exception as e:
+        print(f"❌ Error fetching shabbat/holiday times: {e}")
+        logging.error(f"Error fetching shabbat/holiday times: {e}")
+        return []
+
+# פונקציה לבדיקה אם שבת
+def is_shabbat():
+    now = datetime.datetime.now(jerusalem_tz)
+    for time in shabbat_holiday_times:
+        if time["start"] <= now <= time["end"]:
+            return True
+    return False
 
 # פונקציה לבדוק אם URL תקין
 def is_url_accessible(url):
@@ -73,6 +79,10 @@ async def send_ad():
     ad_text = chosen_ad.get("Ad Text", "No Text")
     image_url = chosen_ad.get("Image URL")
 
+    if is_shabbat():
+        print("📛 שבת - לא ניתן לשלוח הודעות.")
+        return
+
     try:
         if pd.notna(image_url) and is_url_accessible(image_url):
             await bot.send_photo(chat_id=TELEGRAM_CHAT_ID, photo=image_url, caption=ad_text, parse_mode=ParseMode.HTML)
@@ -82,19 +92,26 @@ async def send_ad():
     except Exception as e:
         logging.error(f"Error sending ad: {e}")
 
-# פונקציה לבדוק אם שבת
-def is_shabbat():
-    now = datetime.datetime.now(jerusalem_tz)
-    for _, row in shabbat_times.iterrows():
-        shabbat_start = row["shabbat_start"]
-        shabbat_end = row["shabbat_end"]
-        if shabbat_start <= now <= shabbat_end:
-            return True
-    return False
+# קריאת הנתונים מקובץ Excel
+file_path = 'generated_ads.xlsx'
+try:
+    data = pd.read_excel(file_path)
+    print(f"✅ הקובץ {file_path} נטען בהצלחה.")
+except FileNotFoundError:
+    print(f"❌ שגיאה: הקובץ {file_path} לא נמצא.")
+    logging.error(f"FileNotFoundError: {file_path} not found.")
+    exit()
+
+# המרת ההודעות לרשימה
+ads = data.to_dict(orient="records")
+sent_ads = []
 
 # לולאה לשליחת הודעות
 async def send_ads_loop():
-    print("⏳ הבוט מתחיל לשלוח הודעות...")
+    global shabbat_holiday_times
+    shabbat_holiday_times = fetch_shabbat_holiday_times()
+
+    print("⏳ הבוט ממתין לשעה הראשונה לשליחה...")
     while True:
         now = datetime.datetime.now(jerusalem_tz)
 
